@@ -1,4 +1,3 @@
-
 import { Contact, ContactFormData, Tag } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -127,7 +126,7 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
       ? new Date(contactData.last_contact).toISOString() 
       : null;
 
-    // Update the contact
+    // Update the contact - Fix the Date to string conversion here
     const { data: updatedContact, error } = await supabase
       .from('contacts')
       .update({
@@ -140,7 +139,7 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
         avatar: contactData.avatar,
         favorite: contactData.favorite,
         last_contact: lastContactValue,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString() // Convert Date to string
       })
       .eq('id', id)
       .select()
