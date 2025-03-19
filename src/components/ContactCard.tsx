@@ -5,6 +5,8 @@ import { Mail, Phone, Star, StarOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toggleFavorite } from '@/lib/contacts';
 import { useState } from 'react';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ContactCardProps {
   contact: Contact;
@@ -14,12 +16,30 @@ interface ContactCardProps {
 
 export const ContactCard = ({ contact, className, onUpdate }: ContactCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
+  // Toggle favorite mutation
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: toggleFavorite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact', contact.id] });
+      if (onUpdate) onUpdate();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not update favorite status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
   
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleFavorite(contact.id);
-    if (onUpdate) onUpdate();
+    toggleFavoriteMutation.mutate(contact.id);
   };
   
   return (
@@ -54,6 +74,7 @@ export const ContactCard = ({ contact, className, onUpdate }: ContactCardProps) 
                 "absolute -top-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center transition-all",
                 contact.favorite ? "bg-amber-100 text-amber-500" : isHovering ? "bg-muted text-muted-foreground opacity-80" : "opacity-0"
               )}
+              disabled={toggleFavoriteMutation.isPending}
             >
               {contact.favorite ? (
                 <Star className="h-3 w-3 fill-amber-500 stroke-amber-500" />

@@ -8,41 +8,52 @@ import SearchBar from '@/components/SearchBar';
 import ContactList from '@/components/ContactList';
 import { Button } from '@/components/ui/button';
 import { ArrowUpRight, Check, Plus, Star, Users } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { useQuery } from '@tanstack/react-query';
 
 const Index = () => {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [favoriteContacts, setFavoriteContacts] = useState<Contact[]>([]);
-  const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Contact[] | null>(null);
   
-  useEffect(() => {
-    loadContacts();
-  }, []);
+  // Fetch all contacts
+  const { 
+    data: contacts = [], 
+    isLoading,
+    isError,
+    refetch 
+  } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: getAllContacts
+  });
   
-  const loadContacts = () => {
-    const allContacts = getAllContacts();
-    setContacts(allContacts);
-    
-    // Filter favorite contacts
-    setFavoriteContacts(allContacts.filter(contact => contact.favorite));
-    
-    // Get most recently updated contacts
-    setRecentContacts(
-      [...allContacts]
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-        .slice(0, 5)
-    );
-  };
+  // Derived states
+  const favoriteContacts = contacts.filter(contact => contact.favorite);
+  const recentContacts = [...contacts]
+    .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
+    .slice(0, 5);
   
-  const handleSearch = (query: string) => {
+  // Handle search
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.trim()) {
-      setSearchResults(searchContacts(query));
+      const results = await searchContacts(query);
+      setSearchResults(results);
     } else {
       setSearchResults(null);
     }
   };
+  
+  // Handle errors
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Error loading contacts",
+        description: "Could not load your contacts. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [isError, toast]);
   
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-10">
@@ -63,6 +74,15 @@ const Index = () => {
             <SearchBar onSearch={handleSearch} />
           </div>
           
+          {/* Loading State */}
+          {isLoading && searchResults === null && (
+            <div className="animate-pulse space-y-4">
+              <div className="h-20 bg-muted rounded-xl"></div>
+              <div className="h-20 bg-muted rounded-xl"></div>
+              <div className="h-20 bg-muted rounded-xl"></div>
+            </div>
+          )}
+          
           {/* Search Results */}
           {searchResults !== null && (
             <div className="mb-8 animate-fade-in">
@@ -74,13 +94,13 @@ const Index = () => {
               </div>
               <ContactList 
                 contacts={searchResults} 
-                onUpdate={loadContacts}
+                onUpdate={() => refetch()}
                 emptyMessage={`No results found for "${searchQuery}"`}
               />
             </div>
           )}
           
-          {searchResults === null && (
+          {searchResults === null && !isLoading && (
             <>
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>
@@ -142,7 +162,7 @@ const Index = () => {
                 </div>
                 <ContactList 
                   contacts={recentContacts} 
-                  onUpdate={loadContacts}
+                  onUpdate={() => refetch()}
                   emptyMessage="Add your first contact to get started"
                 />
               </div>
@@ -160,7 +180,7 @@ const Index = () => {
                   </div>
                   <ContactList 
                     contacts={favoriteContacts.slice(0, 3)} 
-                    onUpdate={loadContacts}
+                    onUpdate={() => refetch()}
                   />
                 </div>
               )}

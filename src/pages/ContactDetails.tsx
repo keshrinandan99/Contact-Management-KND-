@@ -8,64 +8,89 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Calendar, Edit, Mail, MapPin, Phone, Star, StarOff, Trash } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const ContactDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  useEffect(() => {
-    if (id) {
-      loadContact(id);
-    }
-  }, [id]);
+  // Fetch contact data
+  const { 
+    data: contact,
+    isLoading,
+    isError,
+    error
+  } = useQuery({
+    queryKey: ['contact', id],
+    queryFn: () => id ? getContactById(id) : Promise.resolve(undefined),
+    enabled: !!id
+  });
   
-  const loadContact = (contactId: string) => {
-    setIsLoading(true);
-    const foundContact = getContactById(contactId);
-    
-    if (foundContact) {
-      setContact(foundContact);
-    } else {
+  // Delete contact mutation
+  const deleteMutation = useMutation({
+    mutationFn: (contactId: string) => deleteContact(contactId),
+    onSuccess: () => {
+      setDeleteDialogOpen(false);
       toast({
-        title: "Contact not found",
+        title: "Contact deleted",
+        description: contact ? `${contact.name} has been deleted successfully.` : "Contact deleted successfully"
+      });
+      navigate('/');
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not delete the contact. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Toggle favorite mutation
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: (contactId: string) => toggleFavorite(contactId),
+    onSuccess: () => {
+      toast({
+        title: contact?.favorite ? "Removed from favorites" : "Added to favorites",
+        description: `${contact?.name} has been ${contact?.favorite ? "removed from" : "added to"} your favorites.`
+      });
+      queryClient.invalidateQueries({ queryKey: ['contact', id] });
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not update favorite status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const handleToggleFavorite = () => {
+    if (!contact) return;
+    toggleFavoriteMutation.mutate(contact.id);
+  };
+  
+  const handleDeleteContact = () => {
+    if (!contact) return;
+    deleteMutation.mutate(contact.id);
+  };
+  
+  // Handle errors
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Error loading contact",
         description: "The requested contact could not be found.",
         variant: "destructive"
       });
       navigate('/');
     }
-    
-    setIsLoading(false);
-  };
-  
-  const handleToggleFavorite = () => {
-    if (!contact) return;
-    
-    toggleFavorite(contact.id);
-    loadContact(contact.id);
-    
-    toast({
-      title: contact.favorite ? "Removed from favorites" : "Added to favorites",
-      description: `${contact.name} has been ${contact.favorite ? "removed from" : "added to"} your favorites.`
-    });
-  };
-  
-  const handleDeleteContact = () => {
-    if (!contact) return;
-    
-    deleteContact(contact.id);
-    setDeleteDialogOpen(false);
-    
-    toast({
-      title: "Contact deleted",
-      description: `${contact.name} has been deleted successfully.`
-    });
-    
-    navigate('/');
-  };
+  }, [isError, navigate, toast]);
   
   // Loading state
   if (isLoading) {
@@ -92,7 +117,7 @@ const ContactDetails = () => {
     );
   }
   
-  // Not found state (should redirect via useEffect, but just in case)
+  // Not found state
   if (!contact) {
     return (
       <div className="min-h-screen bg-background">
@@ -171,6 +196,7 @@ const ContactDetails = () => {
                       size="icon"
                       className="rounded-full"
                       onClick={handleToggleFavorite}
+                      disabled={toggleFavoriteMutation.isPending}
                     >
                       {contact.favorite ? (
                         <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
@@ -191,6 +217,7 @@ const ContactDetails = () => {
                       size="icon"
                       className="rounded-full text-destructive hover:text-destructive"
                       onClick={() => setDeleteDialogOpen(true)}
+                      disabled={deleteMutation.isPending}
                     >
                       <Trash className="h-4 w-4" />
                     </Button>
@@ -216,12 +243,12 @@ const ContactDetails = () => {
                 <div className="mt-6 text-sm text-muted-foreground">
                   <p className="flex items-center justify-center">
                     <Calendar className="h-3 w-3 mr-1.5" />
-                    Added {formatDate(contact.createdAt)}
+                    Added {formatDate(contact.created_at)}
                   </p>
-                  {contact.lastContact && (
+                  {contact.last_contact && (
                     <p className="flex items-center justify-center mt-1">
                       <Calendar className="h-3 w-3 mr-1.5" />
-                      Last contact {formatDate(contact.lastContact)}
+                      Last contact {formatDate(contact.last_contact)}
                     </p>
                   )}
                 </div>
@@ -313,8 +340,9 @@ const ContactDetails = () => {
             <AlertDialogAction 
               onClick={handleDeleteContact}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
             >
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

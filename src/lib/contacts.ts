@@ -1,193 +1,320 @@
 
-import { Contact, ContactFormData } from './types';
+import { Contact, ContactFormData, Tag } from './types';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
-// Initial mock data
-const initialContacts: Contact[] = [
-  {
-    id: '1',
-    name: 'Alex Morgan',
-    email: 'alex@example.com',
-    phone: '+1 (555) 123-4567',
-    company: 'TechCorp Inc.',
-    position: 'Product Manager',
-    favorite: true,
-    avatar: `https://api.dicebear.com/7.x/personas/svg?seed=Alex`,
-    notes: 'Met at the tech conference last month. Interested in our new product.',
-    lastContact: new Date('2023-12-15'),
-    createdAt: new Date('2023-10-01'),
-    updatedAt: new Date('2023-12-15'),
-    tags: ['client', 'tech']
-  },
-  {
-    id: '2',
-    name: 'Taylor Chen',
-    email: 'taylor@example.com',
-    phone: '+1 (555) 987-6543',
-    company: 'Design Studio',
-    position: 'Lead Designer',
-    favorite: false,
-    avatar: `https://api.dicebear.com/7.x/personas/svg?seed=Taylor`,
-    notes: 'Collaborated on the rebrand project. Great design skills.',
-    lastContact: new Date('2024-01-05'),
-    createdAt: new Date('2023-05-15'),
-    updatedAt: new Date('2024-01-05'),
-    tags: ['partner', 'design']
-  },
-  {
-    id: '3',
-    name: 'Jordan Rivera',
-    email: 'jordan@example.com',
-    phone: '+1 (555) 765-4321',
-    company: 'Startup Ventures',
-    position: 'CEO',
-    favorite: true,
-    avatar: `https://api.dicebear.com/7.x/personas/svg?seed=Jordan`,
-    notes: 'Potential investor. Schedule follow-up next quarter.',
-    lastContact: new Date('2023-11-20'),
-    createdAt: new Date('2023-08-10'),
-    updatedAt: new Date('2023-11-20'),
-    tags: ['investor', 'important']
-  },
-  {
-    id: '4',
-    name: 'Casey Williams',
-    email: 'casey@example.com',
-    phone: '+1 (555) 234-5678',
-    company: 'Marketing Solutions',
-    position: 'Marketing Director',
-    favorite: false,
-    avatar: `https://api.dicebear.com/7.x/personas/svg?seed=Casey`,
-    notes: 'Discussed marketing strategy for Q1. Needs proposal by end of month.',
-    lastContact: new Date('2024-01-10'),
-    createdAt: new Date('2023-06-20'),
-    updatedAt: new Date('2024-01-10'),
-    tags: ['client', 'marketing']
-  },
-  {
-    id: '5',
-    name: 'Sam Peterson',
-    email: 'sam@example.com',
-    phone: '+1 (555) 876-5432',
-    company: 'Data Analytics Ltd.',
-    position: 'Data Scientist',
-    favorite: false,
-    avatar: `https://api.dicebear.com/7.x/personas/svg?seed=Sam`,
-    notes: 'Technical expert for our data integration. Very knowledgeable.',
-    lastContact: new Date('2023-12-01'),
-    createdAt: new Date('2023-09-05'),
-    updatedAt: new Date('2023-12-01'),
-    tags: ['technical', 'analytics']
-  },
-];
+// Get all contacts for the current user
+export const getAllContacts = async (): Promise<Contact[]> => {
+  try {
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select(`
+        *,
+        contact_tags (
+          tags (
+            name
+          )
+        )
+      `)
+      .order('updated_at', { ascending: false });
 
-// Use local storage to persist contacts
-const getContacts = (): Contact[] => {
-  if (typeof window === 'undefined') return initialContacts;
-  
-  const storedContacts = localStorage.getItem('contacts');
-  if (storedContacts) {
-    try {
-      // Parse dates properly
-      const contacts = JSON.parse(storedContacts, (key, value) => {
-        if (key === 'lastContact' || key === 'createdAt' || key === 'updatedAt') {
-          return value ? new Date(value) : undefined;
-        }
-        return value;
-      });
-      return contacts;
-    } catch (e) {
-      console.error('Error parsing contacts from localStorage', e);
-      return initialContacts;
-    }
+    if (error) throw error;
+
+    // Process contacts to include tags array
+    return contacts.map(contact => ({
+      ...contact,
+      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
+      created_at: new Date(contact.created_at),
+      updated_at: new Date(contact.updated_at),
+      tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
+    }));
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    return [];
   }
-  
-  // Initialize with mock data if no stored contacts
-  setContacts(initialContacts);
-  return initialContacts;
 };
 
-const setContacts = (contacts: Contact[]): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('contacts', JSON.stringify(contacts));
+// Get a single contact by ID
+export const getContactById = async (id: string): Promise<Contact | undefined> => {
+  try {
+    const { data: contact, error } = await supabase
+      .from('contacts')
+      .select(`
+        *,
+        contact_tags (
+          tags (
+            name
+          )
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      ...contact,
+      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
+      created_at: new Date(contact.created_at),
+      updated_at: new Date(contact.updated_at),
+      tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
+    };
+  } catch (error) {
+    console.error('Error fetching contact:', error);
+    return undefined;
+  }
 };
 
-// CRUD operations
-export const getAllContacts = (): Contact[] => {
-  return getContacts();
+// Create a new contact
+export const addContact = async (contactData: ContactFormData): Promise<Contact | undefined> => {
+  try {
+    // First, insert the contact
+    const { data: newContact, error } = await supabase
+      .from('contacts')
+      .insert({
+        name: contactData.name,
+        email: contactData.email,
+        phone: contactData.phone,
+        company: contactData.company,
+        position: contactData.position,
+        notes: contactData.notes,
+        avatar: contactData.avatar,
+        favorite: contactData.favorite || false,
+        last_contact: contactData.last_contact
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Then, handle tags
+    if (contactData.tags && contactData.tags.length > 0) {
+      await handleContactTags(newContact.id, contactData.tags);
+    }
+
+    return {
+      ...newContact,
+      created_at: new Date(newContact.created_at),
+      updated_at: new Date(newContact.updated_at),
+      tags: contactData.tags || []
+    };
+  } catch (error) {
+    console.error('Error adding contact:', error);
+    return undefined;
+  }
 };
 
-export const getContactById = (id: string): Contact | undefined => {
-  return getContacts().find(contact => contact.id === id);
+// Update an existing contact
+export const updateContact = async (id: string, contactData: ContactFormData): Promise<Contact | undefined> => {
+  try {
+    // Update the contact
+    const { data: updatedContact, error } = await supabase
+      .from('contacts')
+      .update({
+        name: contactData.name,
+        email: contactData.email,
+        phone: contactData.phone,
+        company: contactData.company,
+        position: contactData.position,
+        notes: contactData.notes,
+        avatar: contactData.avatar,
+        favorite: contactData.favorite,
+        last_contact: contactData.last_contact,
+        updated_at: new Date()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Handle tags (delete and recreate for simplicity)
+    await deleteContactTags(id);
+    if (contactData.tags && contactData.tags.length > 0) {
+      await handleContactTags(id, contactData.tags);
+    }
+
+    return {
+      ...updatedContact,
+      created_at: new Date(updatedContact.created_at),
+      updated_at: new Date(updatedContact.updated_at),
+      tags: contactData.tags || []
+    };
+  } catch (error) {
+    console.error('Error updating contact:', error);
+    return undefined;
+  }
 };
 
-export const addContact = (contactData: ContactFormData): Contact => {
-  const contacts = getContacts();
-  const newContact: Contact = {
-    ...contactData,
-    id: Math.random().toString(36).substring(2, 11),
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  
-  const updatedContacts = [newContact, ...contacts];
-  setContacts(updatedContacts);
-  return newContact;
+// Delete a contact
+export const deleteContact = async (id: string): Promise<boolean> => {
+  try {
+    // Delete the contact (cascade will handle contact_tags)
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting contact:', error);
+    return false;
+  }
 };
 
-export const updateContact = (id: string, contactData: ContactFormData): Contact | undefined => {
-  const contacts = getContacts();
-  const index = contacts.findIndex(contact => contact.id === id);
-  
-  if (index === -1) return undefined;
-  
-  const updatedContact: Contact = {
-    ...contacts[index],
-    ...contactData,
-    updatedAt: new Date()
-  };
-  
-  contacts[index] = updatedContact;
-  setContacts(contacts);
-  return updatedContact;
+// Toggle favorite status
+export const toggleFavorite = async (id: string): Promise<boolean> => {
+  try {
+    // First get the current favorite status
+    const { data: contact, error: fetchError } = await supabase
+      .from('contacts')
+      .select('favorite')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Toggle the favorite status
+    const { error: updateError } = await supabase
+      .from('contacts')
+      .update({ 
+        favorite: !contact.favorite,
+        updated_at: new Date()
+      })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+    return true;
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    return false;
+  }
 };
 
-export const deleteContact = (id: string): boolean => {
-  const contacts = getContacts();
-  const filteredContacts = contacts.filter(contact => contact.id !== id);
-  
-  if (filteredContacts.length === contacts.length) return false;
-  
-  setContacts(filteredContacts);
-  return true;
-};
-
-export const toggleFavorite = (id: string): Contact | undefined => {
-  const contacts = getContacts();
-  const index = contacts.findIndex(contact => contact.id === id);
-  
-  if (index === -1) return undefined;
-  
-  const updatedContact = {
-    ...contacts[index],
-    favorite: !contacts[index].favorite,
-    updatedAt: new Date()
-  };
-  
-  contacts[index] = updatedContact;
-  setContacts(contacts);
-  return updatedContact;
-};
-
-export const searchContacts = (query: string): Contact[] => {
-  if (!query.trim()) return getContacts();
+// Search contacts
+export const searchContacts = async (query: string): Promise<Contact[]> => {
+  if (!query.trim()) return await getAllContacts();
   
   const searchTerm = query.toLowerCase().trim();
-  return getContacts().filter(contact => 
-    contact.name.toLowerCase().includes(searchTerm) ||
-    contact.email.toLowerCase().includes(searchTerm) ||
-    contact.company?.toLowerCase().includes(searchTerm) ||
-    contact.position?.toLowerCase().includes(searchTerm) ||
-    contact.phone?.includes(searchTerm) ||
-    contact.tags?.some(tag => tag.toLowerCase().includes(searchTerm))
-  );
+  
+  try {
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select(`
+        *,
+        contact_tags (
+          tags (
+            name
+          )
+        )
+      `)
+      .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,company.ilike.%${searchTerm}%,position.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Process contacts to include tags
+    const processedContacts = contacts.map(contact => ({
+      ...contact,
+      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
+      created_at: new Date(contact.created_at),
+      updated_at: new Date(contact.updated_at),
+      tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
+    }));
+
+    // Also search by tags - This will be a second pass on the already fetched data
+    // For a more efficient solution, this would be done with a more complex query on the server
+    const { data: tagContacts, error: tagError } = await supabase
+      .from('tags')
+      .select(`
+        name,
+        contact_tags (
+          contact_id,
+          contacts (*)
+        )
+      `)
+      .ilike('name', `%${searchTerm}%`);
+
+    if (tagError) throw tagError;
+
+    // Extract contacts from tag results and merge with the previous results
+    const tagMatchedContacts = tagContacts.flatMap(tag => 
+      tag.contact_tags.map((ct: any) => ({
+        ...ct.contacts,
+        last_contact: ct.contacts.last_contact ? new Date(ct.contacts.last_contact) : undefined,
+        created_at: new Date(ct.contacts.created_at),
+        updated_at: new Date(ct.contacts.updated_at),
+        tags: [tag.name] // Simplified, would need a separate query to get all tags
+      }))
+    );
+
+    // Combine results and remove duplicates
+    const allContacts = [...processedContacts, ...tagMatchedContacts];
+    const uniqueContacts = allContacts.filter((contact, index, self) =>
+      index === self.findIndex(c => c.id === contact.id)
+    );
+
+    return uniqueContacts;
+  } catch (error) {
+    console.error('Error searching contacts:', error);
+    return [];
+  }
+};
+
+// Helper function to handle contact tags
+const handleContactTags = async (contactId: string, tagNames: string[]): Promise<void> => {
+  try {
+    // For each tag, ensure it exists, then create the relationship
+    for (const tagName of tagNames) {
+      // Check if tag exists for this user
+      const { data: existingTags, error: tagError } = await supabase
+        .from('tags')
+        .select('id')
+        .eq('name', tagName);
+
+      if (tagError) throw tagError;
+
+      let tagId;
+
+      if (existingTags.length === 0) {
+        // Create new tag
+        const { data: newTag, error: createError } = await supabase
+          .from('tags')
+          .insert({ name: tagName })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        tagId = newTag.id;
+      } else {
+        tagId = existingTags[0].id;
+      }
+
+      // Create relationship
+      const { error: relationError } = await supabase
+        .from('contact_tags')
+        .insert({ contact_id: contactId, tag_id: tagId });
+
+      if (relationError) throw relationError;
+    }
+  } catch (error) {
+    console.error('Error handling contact tags:', error);
+    throw error;
+  }
+};
+
+// Helper function to delete all tags for a contact
+const deleteContactTags = async (contactId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('contact_tags')
+      .delete()
+      .eq('contact_id', contactId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting contact tags:', error);
+    throw error;
+  }
 };
