@@ -198,7 +198,7 @@ export const toggleFavorite = async (id: string): Promise<boolean> => {
       .from('contacts')
       .update({ 
         favorite: !contact.favorite,
-        updated_at: new Date()
+        updated_at: new Date().toISOString() // Convert Date to string
       })
       .eq('id', id);
 
