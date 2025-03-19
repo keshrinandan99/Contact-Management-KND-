@@ -23,6 +23,7 @@ const App = () => (
           <Route path="/contacts/:id" element={<ContactDetails />} />
           <Route path="/contacts/new" element={<CreateContact />} />
           <Route path="/contacts/edit/:id" element={<CreateContact />} />
+          <Route path="/settings" element={<NotFound />} /> {/* Temporary redirect to NotFound */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
