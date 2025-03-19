@@ -1,3 +1,4 @@
+
 import { Contact, ContactFormData, Tag } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -71,6 +72,11 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    // Convert dates to ISO strings for Supabase
+    const lastContactValue = contactData.last_contact 
+      ? new Date(contactData.last_contact).toISOString() 
+      : null;
+    
     // First, insert the contact
     const { data: newContact, error } = await supabase
       .from('contacts')
@@ -83,7 +89,9 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
         notes: contactData.notes,
         avatar: contactData.avatar,
         favorite: contactData.favorite || false,
-        last_contact: contactData.last_contact,
+        last_contact: lastContactValue,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         user_id: user.id
       })
       .select()
@@ -96,6 +104,7 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
       await handleContactTags(newContact.id, contactData.tags, user.id);
     }
 
+    // Return the new contact with tags
     return {
       ...newContact,
       tags: contactData.tags || []
@@ -113,6 +122,11 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    // Convert dates to ISO strings for Supabase
+    const lastContactValue = contactData.last_contact 
+      ? new Date(contactData.last_contact).toISOString() 
+      : null;
+
     // Update the contact
     const { data: updatedContact, error } = await supabase
       .from('contacts')
@@ -125,7 +139,7 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
         notes: contactData.notes,
         avatar: contactData.avatar,
         favorite: contactData.favorite,
-        last_contact: contactData.last_contact,
+        last_contact: lastContactValue,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -140,6 +154,7 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
       await handleContactTags(id, contactData.tags, user.id);
     }
 
+    // Return the updated contact with tags
     return {
       ...updatedContact,
       tags: contactData.tags || []
@@ -288,7 +303,8 @@ const handleContactTags = async (contactId: string, tagNames: string[], userId: 
           .from('tags')
           .insert({ 
             name: tagName,
-            user_id: userId 
+            user_id: userId,
+            created_at: new Date().toISOString()
           })
           .select()
           .single();

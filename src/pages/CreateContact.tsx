@@ -31,14 +31,19 @@ const CreateContact = () => {
   const createMutation = useMutation({
     mutationFn: (data: ContactFormData) => addContact(data),
     onSuccess: (newContact) => {
-      toast({
-        title: "Contact added",
-        description: `${newContact?.name} has been added to your contacts.`
-      });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
       if (newContact) {
+        toast({
+          title: "Contact added",
+          description: `${newContact.name} has been added to your contacts.`
+        });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
         navigate(`/contacts/${newContact.id}`);
       } else {
+        toast({
+          title: "Error",
+          description: "Could not add the contact. Please try again.",
+          variant: "destructive"
+        });
         navigate('/');
       }
     },
@@ -58,15 +63,20 @@ const CreateContact = () => {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ContactFormData }) => updateContact(id, data),
     onSuccess: (updatedContact) => {
-      toast({
-        title: "Contact updated",
-        description: `${updatedContact?.name} has been updated successfully.`
-      });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
-      queryClient.invalidateQueries({ queryKey: ['contact', id] });
       if (updatedContact) {
+        toast({
+          title: "Contact updated",
+          description: `${updatedContact.name} has been updated successfully.`
+        });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        queryClient.invalidateQueries({ queryKey: ['contact', id] });
         navigate(`/contacts/${updatedContact.id}`);
       } else {
+        toast({
+          title: "Error",
+          description: "Could not update the contact. Please try again.",
+          variant: "destructive"
+        });
         navigate('/');
       }
     },

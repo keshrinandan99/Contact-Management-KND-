@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Contact } from '@/lib/types';
@@ -11,12 +10,28 @@ import { ArrowUpRight, Check, Plus, Star, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useQuery } from '@tanstack/react-query';
 
+const sortContacts = (contacts: Contact[], sortBy: string): Contact[] => {
+  return [...contacts].sort((a, b) => {
+    if (sortBy === 'name') {
+      return a.name.localeCompare(b.name);
+    } else if (sortBy === 'recent') {
+      const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return dateB - dateA;
+    } else if (sortBy === 'company') {
+      const companyA = a.company || '';
+      const companyB = b.company || '';
+      return companyA.localeCompare(companyB);
+    }
+    return 0;
+  });
+};
+
 const Index = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Contact[] | null>(null);
   
-  // Fetch all contacts
   const { 
     data: contacts = [], 
     isLoading,
@@ -27,13 +42,9 @@ const Index = () => {
     queryFn: getAllContacts
   });
   
-  // Derived states
   const favoriteContacts = contacts.filter(contact => contact.favorite);
-  const recentContacts = [...contacts]
-    .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
-    .slice(0, 5);
+  const recentContacts = sortContacts([...contacts], 'recent').slice(0, 5);
   
-  // Handle search
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.trim()) {
@@ -44,7 +55,6 @@ const Index = () => {
     }
   };
   
-  // Handle errors
   useEffect(() => {
     if (isError) {
       toast({
@@ -61,7 +71,6 @@ const Index = () => {
       
       <main className="container mx-auto pt-28 px-4">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
           <div className="mb-8 animate-fade-in">
             <h1 className="text-3xl md:text-4xl font-semibold text-foreground">Contact Management</h1>
             <p className="text-muted-foreground mt-2">
@@ -69,12 +78,10 @@ const Index = () => {
             </p>
           </div>
           
-          {/* Search */}
           <div className="mb-8 animate-slide-up" style={{ animationDelay: '100ms' }}>
             <SearchBar onSearch={handleSearch} />
           </div>
           
-          {/* Loading State */}
           {isLoading && searchResults === null && (
             <div className="animate-pulse space-y-4">
               <div className="h-20 bg-muted rounded-xl"></div>
@@ -83,7 +90,6 @@ const Index = () => {
             </div>
           )}
           
-          {/* Search Results */}
           {searchResults !== null && (
             <div className="mb-8 animate-fade-in">
               <div className="flex items-center justify-between mb-4">
@@ -102,7 +108,6 @@ const Index = () => {
           
           {searchResults === null && !isLoading && (
             <>
-              {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>
                 <div className="bg-white dark:bg-card rounded-xl p-6 border border-border shadow-sm">
                   <div className="flex items-start justify-between">
@@ -150,7 +155,6 @@ const Index = () => {
                 </div>
               </div>
               
-              {/* Recent Contacts */}
               <div className="mb-8 animate-slide-up" style={{ animationDelay: '300ms' }}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-medium">Recent Contacts</h2>
@@ -167,7 +171,6 @@ const Index = () => {
                 />
               </div>
               
-              {/* Favorite Contacts */}
               {favoriteContacts.length > 0 && (
                 <div className="animate-slide-up" style={{ animationDelay: '400ms' }}>
                   <div className="flex items-center justify-between mb-4">
