@@ -10,13 +10,13 @@ export interface Contact {
   notes?: string;
   avatar?: string;
   favorite: boolean;
-  last_contact?: Date;
-  created_at: Date;
-  updated_at: Date;
+  last_contact?: string | Date;
+  created_at: string | Date;
+  updated_at: string | Date;
   tags?: string[];
 }
 
-export type ContactFormData = Omit<Contact, 'id' | 'created_at' | 'updatedAt' | 'user_id'>;
+export type ContactFormData = Omit<Contact, 'id' | 'user_id'>;
 
 export interface Tag {
   id: string;

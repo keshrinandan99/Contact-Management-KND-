@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Contact, ContactFormData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -31,13 +30,14 @@ export const ContactForm = ({
     avatar: initialData.avatar || '',
     favorite: initialData.favorite || false,
     tags: initialData.tags || [],
+    updated_at: initialData.updated_at || new Date(),
+    created_at: initialData.created_at || new Date(),
   });
   
   const [tag, setTag] = useState('');
   const [errors, setErrors] = useState<Partial<Record<keyof ContactFormData, string>>>({});
   
   useEffect(() => {
-    // Generate avatar if name changes and no custom avatar is set
     if (formData.name && !initialData.avatar) {
       setFormData(prev => ({
         ...prev,
@@ -52,7 +52,6 @@ export const ContactForm = ({
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error when field is updated
     if (errors[name as keyof ContactFormData]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
@@ -104,7 +103,12 @@ export const ContactForm = ({
     
     if (!validate()) return;
     
-    onSubmit(formData);
+    const updatedData = {
+      ...formData,
+      updated_at: new Date()
+    };
+    
+    onSubmit(updatedData);
   };
   
   return (

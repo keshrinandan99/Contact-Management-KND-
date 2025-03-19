@@ -1,4 +1,3 @@
-
 import { Contact, ContactFormData, Tag } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -23,9 +22,9 @@ export const getAllContacts = async (): Promise<Contact[]> => {
     // Process contacts to include tags array
     return contacts.map(contact => ({
       ...contact,
-      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
-      created_at: new Date(contact.created_at),
-      updated_at: new Date(contact.updated_at),
+      last_contact: contact.last_contact || undefined,
+      created_at: contact.created_at,
+      updated_at: contact.updated_at,
       tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
     }));
   } catch (error) {
@@ -54,9 +53,9 @@ export const getContactById = async (id: string): Promise<Contact | undefined> =
 
     return {
       ...contact,
-      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
-      created_at: new Date(contact.created_at),
-      updated_at: new Date(contact.updated_at),
+      last_contact: contact.last_contact || undefined,
+      created_at: contact.created_at,
+      updated_at: contact.updated_at,
       tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
     };
   } catch (error) {
@@ -68,6 +67,10 @@ export const getContactById = async (id: string): Promise<Contact | undefined> =
 // Create a new contact
 export const addContact = async (contactData: ContactFormData): Promise<Contact | undefined> => {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
     // First, insert the contact
     const { data: newContact, error } = await supabase
       .from('contacts')
@@ -80,7 +83,8 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
         notes: contactData.notes,
         avatar: contactData.avatar,
         favorite: contactData.favorite || false,
-        last_contact: contactData.last_contact
+        last_contact: contactData.last_contact,
+        user_id: user.id
       })
       .select()
       .single();
@@ -89,13 +93,11 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
 
     // Then, handle tags
     if (contactData.tags && contactData.tags.length > 0) {
-      await handleContactTags(newContact.id, contactData.tags);
+      await handleContactTags(newContact.id, contactData.tags, user.id);
     }
 
     return {
       ...newContact,
-      created_at: new Date(newContact.created_at),
-      updated_at: new Date(newContact.updated_at),
       tags: contactData.tags || []
     };
   } catch (error) {
@@ -107,6 +109,10 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
 // Update an existing contact
 export const updateContact = async (id: string, contactData: ContactFormData): Promise<Contact | undefined> => {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
     // Update the contact
     const { data: updatedContact, error } = await supabase
       .from('contacts')
@@ -120,7 +126,7 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
         avatar: contactData.avatar,
         favorite: contactData.favorite,
         last_contact: contactData.last_contact,
-        updated_at: new Date()
+        updated_at: new Date().toISOString()
       })
       .eq('id', id)
       .select()
@@ -131,13 +137,11 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
     // Handle tags (delete and recreate for simplicity)
     await deleteContactTags(id);
     if (contactData.tags && contactData.tags.length > 0) {
-      await handleContactTags(id, contactData.tags);
+      await handleContactTags(id, contactData.tags, user.id);
     }
 
     return {
       ...updatedContact,
-      created_at: new Date(updatedContact.created_at),
-      updated_at: new Date(updatedContact.updated_at),
       tags: contactData.tags || []
     };
   } catch (error) {
@@ -217,9 +221,9 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
     // Process contacts to include tags
     const processedContacts = contacts.map(contact => ({
       ...contact,
-      last_contact: contact.last_contact ? new Date(contact.last_contact) : undefined,
-      created_at: new Date(contact.created_at),
-      updated_at: new Date(contact.updated_at),
+      last_contact: contact.last_contact || undefined,
+      created_at: contact.created_at,
+      updated_at: contact.updated_at,
       tags: contact.contact_tags?.map((ct: any) => ct.tags.name) || []
     }));
 
@@ -242,9 +246,9 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
     const tagMatchedContacts = tagContacts.flatMap(tag => 
       tag.contact_tags.map((ct: any) => ({
         ...ct.contacts,
-        last_contact: ct.contacts.last_contact ? new Date(ct.contacts.last_contact) : undefined,
-        created_at: new Date(ct.contacts.created_at),
-        updated_at: new Date(ct.contacts.updated_at),
+        last_contact: ct.contacts.last_contact || undefined,
+        created_at: ct.contacts.created_at,
+        updated_at: ct.contacts.updated_at,
         tags: [tag.name] // Simplified, would need a separate query to get all tags
       }))
     );
@@ -263,7 +267,7 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
 };
 
 // Helper function to handle contact tags
-const handleContactTags = async (contactId: string, tagNames: string[]): Promise<void> => {
+const handleContactTags = async (contactId: string, tagNames: string[], userId: string): Promise<void> => {
   try {
     // For each tag, ensure it exists, then create the relationship
     for (const tagName of tagNames) {
@@ -271,7 +275,8 @@ const handleContactTags = async (contactId: string, tagNames: string[]): Promise
       const { data: existingTags, error: tagError } = await supabase
         .from('tags')
         .select('id')
-        .eq('name', tagName);
+        .eq('name', tagName)
+        .eq('user_id', userId);
 
       if (tagError) throw tagError;
 
@@ -281,7 +286,10 @@ const handleContactTags = async (contactId: string, tagNames: string[]): Promise
         // Create new tag
         const { data: newTag, error: createError } = await supabase
           .from('tags')
-          .insert({ name: tagName })
+          .insert({ 
+            name: tagName,
+            user_id: userId 
+          })
           .select()
           .single();
 
