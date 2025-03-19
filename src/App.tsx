@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import ContactDetails from "./pages/ContactDetails";
 import CreateContact from "./pages/CreateContact";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -23,7 +24,7 @@ const App = () => (
           <Route path="/contacts/:id" element={<ContactDetails />} />
           <Route path="/contacts/new" element={<CreateContact />} />
           <Route path="/contacts/edit/:id" element={<CreateContact />} />
-          <Route path="/settings" element={<NotFound />} /> {/* Temporary redirect to NotFound */}
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

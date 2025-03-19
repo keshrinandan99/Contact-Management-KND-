@@ -1,6 +1,6 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Contact, Home, PlusCircle, Search, Settings, Users, X } from 'lucide-react';
+import { Contact, Home, LogOut, PlusCircle, Search, Settings, User, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import SearchBar from './SearchBar';
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from './ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const Navigation = () => {
   const location = useLocation();
@@ -21,6 +22,7 @@ export const Navigation = () => {
   const { toast } = useToast();
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   
   useEffect(() => {
     const handleScroll = () => {
@@ -29,6 +31,27 @@ export const Navigation = () => {
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Check for user authentication state
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    
+    checkAuth();
+    
+    // Set up auth state change listener
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
   
   const navItems = [
@@ -45,6 +68,23 @@ export const Navigation = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Could not log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSettingsClick = (action: string) => {
     switch (action) {
       case 'theme':
@@ -57,14 +97,17 @@ export const Navigation = () => {
         navigate('/settings');
         break;
       case 'logout':
-        toast({
-          title: "Logged out",
-          description: "You have been successfully logged out.",
-        });
+        handleSignOut();
         break;
       default:
         break;
     }
+  };
+  
+  // Get initials for user avatar
+  const getUserInitials = () => {
+    if (!user?.email) return 'U';
+    return user.email.charAt(0).toUpperCase();
   };
   
   return (
@@ -130,15 +173,15 @@ export const Navigation = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full focus-visible:ring-0 focus-visible:ring-offset-0">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="text-sm font-medium">AM</span>
+                  <span className="text-sm font-medium">{getUserInitials()}</span>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{user ? user.email : 'Guest'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleSettingsClick('account')}>
-                <Settings className="mr-2 h-4 w-4" />
+                <User className="mr-2 h-4 w-4" />
                 <span>Account Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleSettingsClick('theme')}>
@@ -165,23 +208,17 @@ export const Navigation = () => {
                 <span>Theme</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleSettingsClick('logout')}>
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="mr-2 h-4 w-4"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                <span>Log out</span>
-              </DropdownMenuItem>
+              {user ? (
+                <DropdownMenuItem onClick={() => handleSettingsClick('logout')}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Sign In</span>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
