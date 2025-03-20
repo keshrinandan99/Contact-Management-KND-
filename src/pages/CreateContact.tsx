@@ -86,7 +86,8 @@ const CreateContact = () => {
         navigate('/');
       }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Mutation error:", error);
       toast({
         title: "Error",
         description: "Could not add the contact. Please try again.",
@@ -119,7 +120,8 @@ const CreateContact = () => {
         navigate('/');
       }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Update mutation error:", error);
       toast({
         title: "Error",
         description: "Could not update the contact. Please try again.",
@@ -134,6 +136,7 @@ const CreateContact = () => {
   // Handle form submission
   const handleSubmit = (data: ContactFormData) => {
     setIsSubmitting(true);
+    console.log("Submitting form data:", data);
     
     if (id && contact) {
       updateMutation.mutate({ id, data });

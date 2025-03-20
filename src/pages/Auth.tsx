@@ -15,6 +15,7 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Redirect if already logged in
   if (user) {
@@ -25,26 +26,41 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    const { error } = await signIn(email, password);
-    
-    setIsLoading(false);
-    
-    if (!error) {
-      navigate('/');
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        navigate('/');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Sign in error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
   
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    const { error } = await signUp(email, password);
-    
-    setIsLoading(false);
-    
-    if (!error) {
-      // Stay on the page, as they need to verify their email
+    try {
+      const { error } = await signUp(email, password);
+      
+      if (error) {
+        setError(error.message);
+      }
+      // Stay on the page if successful, as they need to verify their email
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Sign up error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -54,6 +70,12 @@ const Auth = () => {
       
       <main className="container mx-auto pt-28 px-4">
         <div className="max-w-md mx-auto">
+          {error && (
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md text-sm">
+              {error}
+            </div>
+          )}
+          
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="signin">Sign In</TabsTrigger>

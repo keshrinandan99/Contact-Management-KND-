@@ -1,3 +1,4 @@
+
 import { Contact, ContactFormData, Tag } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
@@ -5,6 +6,9 @@ import { toast } from '@/components/ui/use-toast';
 // Get all contacts for the current user
 export const getAllContacts = async (): Promise<Contact[]> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
     const { data: contacts, error } = await supabase
       .from('contacts')
       .select(`
@@ -15,6 +19,7 @@ export const getAllContacts = async (): Promise<Contact[]> => {
           )
         )
       `)
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
@@ -36,6 +41,9 @@ export const getAllContacts = async (): Promise<Contact[]> => {
 // Get a single contact by ID
 export const getContactById = async (id: string): Promise<Contact | undefined> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return undefined;
+
     const { data: contact, error } = await supabase
       .from('contacts')
       .select(`
@@ -47,6 +55,7 @@ export const getContactById = async (id: string): Promise<Contact | undefined> =
         )
       `)
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error) throw error;
@@ -71,6 +80,8 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    console.log('Creating contact for user:', user.id);
+
     // Convert dates to ISO strings for Supabase
     const lastContactValue = contactData.last_contact 
       ? new Date(contactData.last_contact).toISOString() 
@@ -82,11 +93,11 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
       .insert({
         name: contactData.name,
         email: contactData.email,
-        phone: contactData.phone,
-        company: contactData.company,
-        position: contactData.position,
-        notes: contactData.notes,
-        avatar: contactData.avatar,
+        phone: contactData.phone || null,
+        company: contactData.company || null,
+        position: contactData.position || null,
+        notes: contactData.notes || null,
+        avatar: contactData.avatar || null,
         favorite: contactData.favorite || false,
         last_contact: lastContactValue,
         created_at: new Date().toISOString(),
@@ -96,7 +107,12 @@ export const addContact = async (contactData: ContactFormData): Promise<Contact 
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error inserting contact:', error);
+      throw error;
+    }
+
+    console.log('Contact created successfully:', newContact);
 
     // Then, handle tags
     if (contactData.tags && contactData.tags.length > 0) {
@@ -132,20 +148,24 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
       .update({
         name: contactData.name,
         email: contactData.email,
-        phone: contactData.phone,
-        company: contactData.company,
-        position: contactData.position,
-        notes: contactData.notes,
-        avatar: contactData.avatar,
-        favorite: contactData.favorite,
+        phone: contactData.phone || null,
+        company: contactData.company || null,
+        position: contactData.position || null,
+        notes: contactData.notes || null,
+        avatar: contactData.avatar || null,
+        favorite: contactData.favorite || false,
         last_contact: lastContactValue,
         updated_at: new Date().toISOString() // Convert Date to string
       })
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating contact:', error);
+      throw error;
+    }
 
     // Handle tags (delete and recreate for simplicity)
     await deleteContactTags(id);
@@ -167,11 +187,15 @@ export const updateContact = async (id: string, contactData: ContactFormData): P
 // Delete a contact
 export const deleteContact = async (id: string): Promise<boolean> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
     // Delete the contact (cascade will handle contact_tags)
     const { error } = await supabase
       .from('contacts')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) throw error;
     return true;
@@ -184,11 +208,15 @@ export const deleteContact = async (id: string): Promise<boolean> => {
 // Toggle favorite status
 export const toggleFavorite = async (id: string): Promise<boolean> => {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
     // First get the current favorite status
     const { data: contact, error: fetchError } = await supabase
       .from('contacts')
       .select('favorite')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (fetchError) throw fetchError;
@@ -200,7 +228,8 @@ export const toggleFavorite = async (id: string): Promise<boolean> => {
         favorite: !contact.favorite,
         updated_at: new Date().toISOString() // Convert Date to string
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (updateError) throw updateError;
     return true;
@@ -217,6 +246,9 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
   const searchTerm = query.toLowerCase().trim();
   
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
     const { data: contacts, error } = await supabase
       .from('contacts')
       .select(`
@@ -227,6 +259,7 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
           )
         )
       `)
+      .eq('user_id', user.id)
       .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,company.ilike.%${searchTerm}%,position.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
       .order('updated_at', { ascending: false });
 
@@ -252,6 +285,7 @@ export const searchContacts = async (query: string): Promise<Contact[]> => {
           contacts (*)
         )
       `)
+      .eq('user_id', user.id)
       .ilike('name', `%${searchTerm}%`);
 
     if (tagError) throw tagError;
