@@ -1,10 +1,17 @@
-
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Contact, Home, LogOut, PlusCircle, Search, Settings, User, Users, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
-import SearchBar from './SearchBar';
-import { Button } from './ui/button';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Menu,
+  Search,
+  Settings,
+  X,
+  LogOut,
+  LogIn,
+  User,
+  Users
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,236 +19,218 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from './ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+} from "@/components/ui/dropdown-menu"
+import { useAuth } from '@/lib/auth';
 
-export const Navigation = () => {
-  const location = useLocation();
+const Navigation = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [scrolled, setScrolled] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-  
-  // Check for user authentication state
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    
-    checkAuth();
-    
-    // Set up auth state change listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
-    
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-  
-  const navItems = [
-    { icon: Home, label: 'Dashboard', path: '/' },
-    { icon: Users, label: 'Contacts', path: '/contacts' },
-    { icon: PlusCircle, label: 'Add Contact', path: '/contacts/new' },
-    { icon: Settings, label: 'Settings', path: '/settings' }
-  ];
   
   const handleSearch = (query: string) => {
+    setSearchValue(query);
     if (query.trim()) {
       navigate(`/contacts?search=${encodeURIComponent(query.trim())}`);
-      setSearchOpen(false);
+    } else {
+      navigate('/contacts');
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      });
-      navigate('/');
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Could not log out. Please try again.",
-        variant: "destructive"
-      });
-    }
+  const handleSearchIconClick = () => {
+    setSearching(true);
   };
 
-  const handleSettingsClick = (action: string) => {
-    switch (action) {
-      case 'theme':
-        toast({
-          title: "Theme settings",
-          description: "Theme settings will be implemented in a future update.",
-        });
-        break;
-      case 'account':
-        navigate('/settings');
-        break;
-      case 'logout':
-        handleSignOut();
-        break;
-      default:
-        break;
-    }
+  const handleSearchCancel = () => {
+    setSearching(false);
+    setSearchValue('');
+    navigate('/contacts');
   };
-  
-  // Get initials for user avatar
-  const getUserInitials = () => {
-    if (!user?.email) return 'U';
-    return user.email.charAt(0).toUpperCase();
-  };
-  
+
   return (
-    <header className={cn(
-      "fixed top-0 left-0 right-0 z-10 transition-all duration-300 ease-in-out px-4 py-4",
-      scrolled ? "bg-white/80 backdrop-blur-md shadow-sm" : "bg-transparent"
-    )}>
-      <div className="container mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2">
-          <Contact className="h-8 w-8 text-primary" />
-          <span className="text-xl font-semibold">Contacts</span>
-        </Link>
-        
-        <nav className="hidden md:flex items-center space-x-6">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center space-x-1 text-sm font-medium py-2 px-3 rounded-md transition-all",
-                location.pathname === item.path 
-                  ? "text-primary bg-primary/10" 
-                  : "text-foreground/80 hover:text-primary hover:bg-primary/5"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
+    <header className="fixed top-0 left-0 w-full z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo and navigation */}
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center text-foreground">
+              <Users className="h-5 w-5 mr-2" />
+              <span className="font-medium">ContactBook</span>
             </Link>
-          ))}
-        </nav>
-        
-        <div className="flex items-center space-x-4">
-          {searchOpen ? (
-            <div className="absolute inset-x-0 top-0 bg-white dark:bg-background z-20 px-4 py-4 shadow-md animate-in slide-in-from-top">
-              <div className="container mx-auto flex items-center">
-                <SearchBar 
-                  onSearch={handleSearch} 
-                  className="flex-1 mr-2" 
-                  placeholder="Search and press Enter..."
-                />
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setSearchOpen(false)}
-                  className="ml-2"
+            
+            <nav className="hidden md:ml-8 md:flex md:space-x-1">
+              <Link
+                to="/"
+                className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
+              >
+                Home
+              </Link>
+              <Link
+                to="/contacts"
+                className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
+              >
+                Contacts
+              </Link>
+              {user && (
+                <Link
+                  to="/contacts/new"
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
                 >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
+                  New Contact
+                </Link>
+              )}
+            </nav>
+          </div>
+          
+          {/* Search bar (mobile full-width) */}
+          {searching && (
+            <div className="absolute top-0 left-0 w-full h-16 bg-background px-4 flex items-center z-50">
+              <Input
+                type="search"
+                placeholder="Search contacts..."
+                className="flex-1 h-10"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchValue.trim()) {
+                    navigate(`/contacts?search=${encodeURIComponent(searchValue.trim())}`);
+                    setSearching(false);
+                  } else if (e.key === 'Escape') {
+                    setSearching(false);
+                  }
+                }}
+                autoFocus
+              />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="ml-2" 
+                onClick={handleSearchCancel}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          ) : (
+          )}
+          
+          {/* Right side icons */}
+          <div className="flex items-center">
+            {!searching && (
+              <Button variant="ghost" size="icon" onClick={handleSearchIconClick} className="mr-1">
+                <Search className="h-5 w-5" />
+              </Button>
+            )}
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {user ? (
+                  <>
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col">
+                        <span>Account</span>
+                        <span className="text-xs font-normal text-muted-foreground truncate max-w-[12rem]">
+                          {user.email}
+                        </span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : (
+                  <DropdownMenuItem asChild>
+                    <Link to="/auth" className="cursor-pointer">
+                      <LogIn className="mr-2 h-4 w-4" />
+                      <span>Sign In</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                
+                {user && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="cursor-pointer text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign Out</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Mobile menu button */}
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setSearchOpen(true)} 
-              className="rounded-full p-2 text-muted-foreground hover:text-primary transition-colors"
+              className="ml-1 md:hidden" 
+              onClick={() => setIsOpen(!isOpen)}
             >
-              <Search className="h-5 w-5" />
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
-          )}
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full focus-visible:ring-0 focus-visible:ring-offset-0">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="text-sm font-medium">{getUserInitials()}</span>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>{user ? user.email : 'Guest'}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleSettingsClick('account')}>
-                <User className="mr-2 h-4 w-4" />
-                <span>Account Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSettingsClick('theme')}>
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="mr-2 h-4 w-4"
-                >
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
-                </svg>
-                <span>Theme</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {user ? (
-                <DropdownMenuItem onClick={() => handleSettingsClick('logout')}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => navigate('/settings')}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Sign In</span>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          </div>
         </div>
       </div>
       
-      {/* Mobile navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border flex justify-around py-2 px-4">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={cn(
-              "flex flex-col items-center p-2 rounded-md",
-              location.pathname === item.path 
-                ? "text-primary" 
-                : "text-muted-foreground"
-            )}
-          >
-            <item.icon className="h-5 w-5" />
-            <span className="text-xs mt-1">{item.label}</span>
-          </Link>
-        ))}
-      </div>
+      {/* Mobile menu */}
+      {isOpen && (
+        <div className="md:hidden bg-background border-b border-border">
+          <div className="container mx-auto px-4 py-2">
+            <nav className="flex flex-col space-y-1">
+              <Link
+                to="/"
+                className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
+                onClick={() => setIsOpen(false)}
+              >
+                Home
+              </Link>
+              <Link
+                to="/contacts"
+                className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
+                onClick={() => setIsOpen(false)}
+              >
+                Contacts
+              </Link>
+              {user && (
+                <Link
+                  to="/contacts/new"
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground"
+                  onClick={() => setIsOpen(false)}
+                >
+                  New Contact
+                </Link>
+              )}
+              {user ? (
+                <Link
+                  to="/settings"
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground flex items-center"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Link>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="px-3 py-2 text-sm font-medium text-muted-foreground rounded-md hover:bg-accent hover:text-foreground flex items-center"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </Link>
+              )}
+            </nav>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

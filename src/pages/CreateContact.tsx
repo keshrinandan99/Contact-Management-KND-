@@ -1,13 +1,15 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ContactFormData } from '@/lib/types';
 import { addContact, getContactById, updateContact } from '@/lib/contacts';
 import Navigation from '@/components/Navigation';
 import ContactForm from '@/components/ContactForm';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, LogIn } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/auth';
+import { Button } from '@/components/ui/button';
 
 const CreateContact = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,43 @@ const CreateContact = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  // Redirect to auth if not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Navigation />
+        
+        <main className="container mx-auto pt-28 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6 flex items-center">
+              <button
+                onClick={() => navigate(-1)}
+                className="text-muted-foreground hover:text-foreground flex items-center text-sm"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </button>
+            </div>
+            
+            <div className="bg-white dark:bg-card rounded-xl border border-border shadow-sm p-6 md:p-8 text-center">
+              <h2 className="text-xl font-medium mb-4">Authentication Required</h2>
+              <p className="text-muted-foreground mb-6">
+                Please sign in to add or edit contacts.
+              </p>
+              <Button asChild className="mx-auto">
+                <Link to="/auth">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign In
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
   
   // Fetch contact data if in edit mode
   const { 
