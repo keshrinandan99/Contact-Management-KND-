@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Contact } from '@/lib/types';
@@ -6,7 +7,7 @@ import Navigation from '@/components/Navigation';
 import SearchBar from '@/components/SearchBar';
 import ContactList from '@/components/ContactList';
 import { Button } from '@/components/ui/button';
-import { ArrowUpRight, Check, Plus, Star, Users } from 'lucide-react';
+import { ArrowUpRight, Check, LogIn, Plus, Star, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
