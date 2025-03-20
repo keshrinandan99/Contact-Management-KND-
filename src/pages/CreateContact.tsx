@@ -76,7 +76,8 @@ const CreateContact = () => {
           description: `${newContact.name} has been added to your contacts.`
         });
         queryClient.invalidateQueries({ queryKey: ['contacts'] });
-        navigate(`/contacts/${newContact.id}`);
+        // Redirect to dashboard/home page instead of contact details
+        navigate('/');
       } else {
         toast({
           title: "Error",
@@ -110,7 +111,8 @@ const CreateContact = () => {
         });
         queryClient.invalidateQueries({ queryKey: ['contacts'] });
         queryClient.invalidateQueries({ queryKey: ['contact', id] });
-        navigate(`/contacts/${updatedContact.id}`);
+        // Redirect to dashboard/home page instead of contact details
+        navigate('/');
       } else {
         toast({
           title: "Error",
